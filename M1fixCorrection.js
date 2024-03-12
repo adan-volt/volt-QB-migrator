@@ -10,7 +10,7 @@ function transformDataClients(data,qb,cashflow) {
         return false;
     }
     const cashflowIndex = cashflow.findIndex(d=>d[15].value == qb[index][3].value && d[6].value == 'M1');
-    if(cashflowIndex == -1){
+    if(cashflowIndex != -1){
         return false;
     }
     //A partir de aca no hay repetidos de M1 (jobs SIN M1)
