@@ -9,14 +9,15 @@ function transformDataClients(data,qb,cashflow) {
     if(index == -1){
         return false;
     }
-    const cashflowIndex = cashflow.findIndex(d=>d[15].value == qb[index][3].value && d[6].value == 'Clawback');
+    const cashflowIndex = cashflow.findIndex(d=>d[15].value == qb[index][3].value && d[6].value == 'M1');
     if(cashflowIndex == -1){
         return false;
     }
+    //A partir de aca no hay repetidos de M1 (jobs SIN M1)
     if(!data['Applied in']){
         return false;
     }
-    transformedData.data[0][3] = {"value":cashflow[cashflowIndex][15].value};
+    // transformedData.data[0][3] = {"value":cashflow[cashflowIndex][15].value}; //Si vos mandas el registro 3, hace un UPDATE en vez del INSERT
     transformedData.data[0][8] = {"value":(cashflow[cashflowIndex][8].value+' | '+data['Applied in']).replace('| undefined','')};
     
     return transformedData.data[0];
