@@ -6,10 +6,11 @@ const formatDate = (dataValue)=>{
     const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}T${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}Z`;
     return formattedDate;
   }
-function transformDataClients(data,qb) {
+function transformDataClients(data,qb,jact,messages) {
     const nameToEmailMap = {
         "Orlando Andrade": "projectmanagerabundant@gmail.com",
         "Fermin Anzoátegui": "fa@voltsolarenergy.com",
+        "Fermin Anzoategui": "fa@voltsolarenergy.com",
         "Camilo Uribe & Carmen Astudillo": "cu@voltsolarenergy.com",
         "Carmen Astudillo Mendoza": "cam@voltsolarenergy.com",
         "Marcos Balbiani": "mab@voltsolarenergy.com",
@@ -117,35 +118,46 @@ function transformDataClients(data,qb) {
         "Noam Shalom": "info@greennetworkenergy.net",
         "Aldo Sosa": "as@voltsolarenergy.com",
         "Pedro Vallega": "pv@voltsolarenergy.com",
-        "Andres Felipe Wasson": "andres@soleicenergy.com"
+        "Andres Felipe Wasson": "andres@soleicenergy.com",
+        "Automation (Work Order)":"automations@voltsolarenergy.com"
     };
     
     const transformedData = { data: [{}] };
-    if(!data['primary']){
+    if(!jact['primary']){
         return false;
     }
-    const index = qb.findIndex(d=>d[451].value == data['primary']['id']);
+    const index = qb.findIndex(d=>d[451].value == jact['primary']['id']);
     // console.log(qb[index][3].value);
     if(index == -1){
         return false;
     }
-    
-    transformedData.data[0][7] = {"value":data['note']};
+    if(!nameToEmailMap[jact['CreatedBy']['Name']]){
+        return false;
+    }
+    transformedData.data[0][7] = {"value":jact['Text']};
     transformedData.data[0][12] = {"value":qb[index][3].value};
-    transformedData.data[0][30] = {"value":nameToEmailMap[data['created_by_name']]};
-    transformedData.data[0][27] = {"value":data['type']};
-    const date = new Date(data['date_created']*1000);
+    transformedData.data[0][30] = {"value":nameToEmailMap[jact['CreatedBy']['Name']]};
+    transformedData.data[0][27] = {"value":jact['ActivityType']['Name']};
+    const date = new Date(jact['DateCreated']*1000);
     transformedData.data[0][28] = {"value":formatDate(date)};
     transformedData.data[0][29] = {"value":true};
+    transformedData.data[0][31] = {"value":true};
+
+    const rowExists = messages.findIndex(d=>d[12].value == qb[index][3].value 
+        && d[28].value == formatDate(date) 
+        && d[27].value == jact['ActivityType']['Name'] 
+        // && d[30].value == nameToEmailMap[jact['CreatedBy']['Name']]
+        );
+        // console.log(rowExists,'row');
+    if(rowExists != -1){
+        return false;
+    }
     return transformedData.data[0];
   }
   (async () => {
     try {
         const activities = [];
-        const ja1 = await queryJobnimbusRecordsActivities(10);
-        console.log(ja1);
-        process.exit();
-        const ja2 = await queryJobnimbusRecordsActivities(11);
+        
         // const ja3 = await queryJobnimbusRecordsActivities(10);
         // const ja4 = await queryJobnimbusRecordsActivities(11);
         // const ja5 = await queryJobnimbusRecordsActivities(12);
@@ -155,39 +167,54 @@ function transformDataClients(data,qb) {
         // const ja9 = await queryJobnimbusRecordsActivities(8);
         // const ja10 = await queryJobnimbusRecordsActivities(9);
         
-        const ja = [...ja1,...ja2]
-        console.log(ja);
-        process.exit(-1);
+        // const ja = [...ja1,...ja2]
+        // console.log(ja);
+        // process.exit(-1);
         // ,...ja3,...ja4,...ja5]
             // ,...ja6,...ja7,...ja8,...ja9,...ja10];
         
         // Call the function with the provided data and mapping
-        
+        const j1 = await queryJobnimbusRecords(0);
+        const j2 = await queryJobnimbusRecords(1);
+        // const jnJobs = [...j1, ...j2].slice(0,1); // Assuming you only want the first record combined from both queries
+        // const jnJobs = [...j1, ...j2].slice(400,500); // Assuming you only want the first record combined from both queries
+        const jnJobs = [...j1, ...j2]; // Assuming you only want the first record combined from both queries
         const qb = await queryQuickBaseRecords('btq2f4rea',[3,451]); //JOBS
+        const messages = await queryQuickBaseRecords('btrq5gg2x',[12,28,27,30]);
         // Use Promise.all to wait for all transformations and save operations to complete
         
         // console.log(cashflow.filter(d=>d[6].value == 'M3'))
 
-        let transformedAll = [];
-            ja.map(async (job) => {
-              const transformed = transformDataClients(job,qb);
-              if(transformed){
-                transformedAll.push(transformed);
-              }
-              
-              // if (transformed[6]) {
-              //     console.log(transformed);
-              //     return saveQuickBaseRecords('btq2f4rcs', [transformed]); // Insert job
-              // } else {
-              //     // Handle the case where transformation returns null or undefined
-              //     console.log("Transformation returned no result for job:", job['jnid']);
-              //     return null;
-              // }
-          });
-          console.log(transformedAll);
-          const save = await saveQuickBaseRecords('btrq5gg2x', transformedAll); // Insert job
-          console.log(save);
-          console.log(save.metadata.lineErrors)
+        
+        for (let i=0;i<jnJobs.length;i++){
+            
+            setTimeout(async()=>{
+                const job = jnJobs[i];
+                const jobActivities = await queryJobnimbusRecordsActivities(job['jnid']);
+                let transformedAll = [];
+                    jobActivities.forEach(ja=>{
+                        const transformed = transformDataClients(job,qb,ja,messages);
+                        if(transformed){
+                            transformedAll.push(transformed);
+                        }
+                    })
+                    console.log(transformedAll);
+                    if(transformedAll.length> 0){
+                        const save = await saveQuickBaseRecords('btrq5gg2x', transformedAll); // Insert job => 25MB
+                        console.log(save);
+                    }
+            },250*i)
+            // if (transformed[6]) {
+            //     console.log(transformed);
+            //     return saveQuickBaseRecords('btq2f4rcs', [transformed]); // Insert job
+            // } else {
+            //     // Handle the case where transformation returns null or undefined
+            //     console.log("Transformation returned no result for job:", job['jnid']);
+            //     return null;
+            // }
+          }
+          
+        //   console.log(save.metadata.lineErrors)
 
     } catch (error) {
         // Catch and log any error that occurs during the entire process
